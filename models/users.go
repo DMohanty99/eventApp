@@ -1,7 +1,10 @@
 package models
 
 import (
+	"errors"
+
 	"github.com/DMohanty99/eventApp/db"
+	"github.com/DMohanty99/eventApp/utils"
 )
 
 type User struct {
@@ -20,7 +23,12 @@ func (u *User) Save() error {
 
 	defer stmt.Close() // defer statement used to close the statement
 
-	result, err := stmt.Exec(u.Email, u.Password)
+	hashedPassword, err := utils.HashPassword(u.Password)
+	if err != nil {
+		return err
+	}
+
+	result, err := stmt.Exec(u.Email, hashedPassword)
 
 	if err != nil {
 		return err
@@ -34,4 +42,24 @@ func (u *User) Save() error {
 	}
 
 	return err
+}
+
+func (u *User) ValidateCred() error {
+
+	query := "SELECT id,password FROM users where email = ?"
+	row := db.DB.QueryRow(query, u.Email)
+
+	var retrievedPassword string
+	err := row.Scan(&u.Id, &retrievedPassword)
+
+	if err != nil {
+		return errors.New("Invalid Credentials")
+	}
+	ok := utils.CheckPasswordHash(u.Password, retrievedPassword)
+
+	if ok != true {
+		return errors.New("Invalid Credentials")
+	}
+	return nil
+
 }
